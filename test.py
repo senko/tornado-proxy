@@ -12,7 +12,8 @@ import time
 
 class TestProxy(unittest.TestCase):
     def setUp(self):
-        self.proxy = subprocess.Popen(['python', 'proxy/proxy.py', '8888'])
+        self.proxy = subprocess.Popen(['python', 'tornado_proxy/proxy.py',
+            '8888'])
         proxy_support = urllib2.ProxyHandler({
             "https": "http://localhost:8888",
             "http": "http://localhost:8888"

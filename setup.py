@@ -31,5 +31,5 @@ setup(
     cmdclass={
         'test': TestCommand
     },
-    packages=['proxy'],
+    packages=['tornado_proxy'],
 )
