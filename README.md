@@ -27,6 +27,12 @@ Can be used as standalone script, or integrated with your Tornado app.
     tornado.ioloop.IOLoop.instance().start()
 
 
+### Based on
+
+GET and POST proxying is heavily based on the code by Bill Janssen posted to:
+http://groups.google.com/group/python-tornado/msg/7bea08e7a049cf26
+
+
 ### License and copyright
 
 Copyright (C) 2012 Senko Rasic <senko.rasic@dobarkod.hr>
