@@ -69,7 +69,7 @@ class ProxyHandler(tornado.web.RequestHandler):
         try:
             client.fetch(req, handle_response)
         except tornado.httpclient.HTTPError, e:
-            if hasattr(e, response) and e.response:
+            if hasattr(e, 'response') and e.response:
                 self.handle_response(e.response)
             else:
                 self.set_status(500)
