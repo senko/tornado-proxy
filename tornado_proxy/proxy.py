@@ -91,10 +91,18 @@ class ProxyHandler(tornado.web.RequestHandler):
         def read_from_upstream(data):
             client.write(data)
 
-        def client_close(_dummy):
+        def client_close(data=None):
+            if upstream.closed():
+                return
+            if data:
+                upstream.write(data)
             upstream.close()
 
-        def upstream_close(_dummy):
+        def upstream_close(data=None):
+            if client.closed():
+                return
+            if data:
+                client.write(data)
             client.close()
 
         def start_tunnel():
