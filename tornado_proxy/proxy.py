@@ -70,7 +70,7 @@ class ProxyHandler(tornado.web.RequestHandler):
             client.fetch(req, handle_response)
         except tornado.httpclient.HTTPError as e:
             if hasattr(e, 'response') and e.response:
-                self.handle_response(e.response)
+                handle_response(e.response)
             else:
                 self.set_status(500)
                 self.write('Internal server error:\n' + str(e))
