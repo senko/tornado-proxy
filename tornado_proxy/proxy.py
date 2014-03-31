@@ -48,7 +48,6 @@ class ProxyHandler(tornado.web.RequestHandler):
                     tornado.httpclient.HTTPError):
                 self.set_status(500)
                 self.write('Internal server error:\n' + str(response.error))
-                self.finish()
             else:
                 self.set_status(response.code)
                 for header in ('Date', 'Cache-Control', 'Server',
@@ -58,7 +57,7 @@ class ProxyHandler(tornado.web.RequestHandler):
                         self.set_header(header, v)
                 if response.body:
                     self.write(response.body)
-                self.finish()
+            self.finish()
 
         req = tornado.httpclient.HTTPRequest(url=self.request.uri,
             method=self.request.method, body=self.request.body,
