@@ -51,7 +51,7 @@ class ProxyHandler(tornado.web.RequestHandler):
             else:
                 self.set_status(response.code)
                 for header in ('Date', 'Cache-Control', 'Server',
-                        'Content-Type', 'Location'):
+                               'Content-Type', 'Location', 'Set-Cookie'):
                     v = response.headers.get(header)
                     if v:
                         self.set_header(header, v)
