@@ -45,14 +45,19 @@ def get_proxy(url):
     return os.environ.get(proxy_key)
 
 
+def parse_proxy(proxy):
+    proxy_parsed = urlparse(proxy, scheme='http')
+    return proxy_parsed.hostname, proxy_parsed.port
+
+
 def fetch_request(url, callback, **kwargs):
     proxy = get_proxy(url)
     if proxy:
         tornado.httpclient.AsyncHTTPClient.configure(
             'tornado.curl_httpclient.CurlAsyncHTTPClient')
-        proxy_parsed = urlparse(proxy, scheme='http')
-        kwargs['proxy_host'] = proxy_parsed.hostname
-        kwargs['proxy_port'] = proxy_parsed.port
+        host, port = parse_proxy(proxy)
+        kwargs['proxy_host'] = host
+        kwargs['proxy_port'] = port
 
     req = tornado.httpclient.HTTPRequest(url, **kwargs)
     client = tornado.httpclient.AsyncHTTPClient()
@@ -131,9 +136,32 @@ class ProxyHandler(tornado.web.RequestHandler):
             upstream.read_until_close(upstream_close, read_from_upstream)
             client.write(b'HTTP/1.0 200 Connection established\r\n\r\n')
 
+        def on_proxy_response(data=None):
+            if data:
+                first_line = data.splitlines()[0]
+                http_v, status, text = first_line.split(None, 2)
+                if int(status) == 200:
+                    start_tunnel()
+                    return
+
+            self.set_status(500)
+            self.finish()
+
+        def start_proxy_tunnel():
+            upstream.write('CONNECT %s HTTP/1.1\r\n' % self.request.uri)
+            upstream.write('Host: %s\r\n' % self.request.uri)
+            upstream.write('Proxy-Connection: Keep-Alive\r\n\r\n')
+            upstream.read_until('\r\n\r\n', on_proxy_response)
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         upstream = tornado.iostream.IOStream(s)
-        upstream.connect((host, int(port)), start_tunnel)
+
+        proxy = get_proxy(self.request.uri)
+        if proxy:
+            proxy_host, proxy_port = parse_proxy(proxy)
+            upstream.connect((proxy_host, proxy_port), start_proxy_tunnel)
+        else:
+            upstream.connect((host, int(port)), start_tunnel)
 
 
 def run_proxy(port, start_ioloop=True):
