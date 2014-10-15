@@ -25,6 +25,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import logging
 import os
 import sys
 import socket
@@ -35,6 +36,8 @@ import tornado.ioloop
 import tornado.iostream
 import tornado.web
 import tornado.httpclient
+
+logger = logging.getLogger('tornado_proxy')
 
 __all__ = ['ProxyHandler', 'run_proxy']
 
@@ -53,6 +56,7 @@ def parse_proxy(proxy):
 def fetch_request(url, callback, **kwargs):
     proxy = get_proxy(url)
     if proxy:
+        logger.debug('Forward request via upstream proxy %s', proxy)
         tornado.httpclient.AsyncHTTPClient.configure(
             'tornado.curl_httpclient.CurlAsyncHTTPClient')
         host, port = parse_proxy(proxy)
@@ -69,6 +73,9 @@ class ProxyHandler(tornado.web.RequestHandler):
 
     @tornado.web.asynchronous
     def get(self):
+        logger.debug('Handle %s request to %s', self.request.method,
+                     self.request.uri)
+
         def handle_response(response):
             if (response.error and not
                     isinstance(response.error, tornado.httpclient.HTTPError)):
@@ -108,6 +115,7 @@ class ProxyHandler(tornado.web.RequestHandler):
 
     @tornado.web.asynchronous
     def connect(self):
+        logger.debug('Start CONNECT to %s', self.request.uri)
         host, port = self.request.uri.split(':')
         client = self.request.connection.stream
 
@@ -132,6 +140,7 @@ class ProxyHandler(tornado.web.RequestHandler):
             client.close()
 
         def start_tunnel():
+            logger.debug('CONNECT tunnel established to %s', self.request.uri)
             client.read_until_close(client_close, read_from_client)
             upstream.read_until_close(upstream_close, read_from_upstream)
             client.write(b'HTTP/1.0 200 Connection established\r\n\r\n')
@@ -141,6 +150,7 @@ class ProxyHandler(tornado.web.RequestHandler):
                 first_line = data.splitlines()[0]
                 http_v, status, text = first_line.split(None, 2)
                 if int(status) == 200:
+                    logger.debug('Connected to upstream proxy %s', proxy)
                     start_tunnel()
                     return
 
