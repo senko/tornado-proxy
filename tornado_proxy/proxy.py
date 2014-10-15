@@ -25,8 +25,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import sys
 import socket
+from urlparse import urlparse
 
 import tornado.httpserver
 import tornado.ioloop
@@ -37,15 +39,34 @@ import tornado.httpclient
 __all__ = ['ProxyHandler', 'run_proxy']
 
 
+def get_proxy(url):
+    url_parsed = urlparse(url, scheme='http')
+    proxy_key = '%s_proxy' % url_parsed.scheme
+    return os.environ.get(proxy_key)
+
+
+def fetch_request(url, callback, **kwargs):
+    proxy = get_proxy(url)
+    if proxy:
+        tornado.httpclient.AsyncHTTPClient.configure(
+            'tornado.curl_httpclient.CurlAsyncHTTPClient')
+        proxy_parsed = urlparse(proxy, scheme='http')
+        kwargs['proxy_host'] = proxy_parsed.hostname
+        kwargs['proxy_port'] = proxy_parsed.port
+
+    req = tornado.httpclient.HTTPRequest(url, **kwargs)
+    client = tornado.httpclient.AsyncHTTPClient()
+    client.fetch(req, callback)
+
+
 class ProxyHandler(tornado.web.RequestHandler):
     SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']
 
     @tornado.web.asynchronous
     def get(self):
-
         def handle_response(response):
-            if response.error and not isinstance(response.error,
-                    tornado.httpclient.HTTPError):
+            if (response.error and not
+                    isinstance(response.error, tornado.httpclient.HTTPError)):
                 self.set_status(500)
                 self.write('Internal server error:\n' + str(response.error))
             else:
@@ -59,14 +80,15 @@ class ProxyHandler(tornado.web.RequestHandler):
                     self.write(response.body)
             self.finish()
 
-        req = tornado.httpclient.HTTPRequest(url=self.request.uri,
-            method=self.request.method, body=self.request.body,
-            headers=self.request.headers, follow_redirects=False,
-            allow_nonstandard_methods=True)
-
-        client = tornado.httpclient.AsyncHTTPClient()
+        body = self.request.body
+        if not body:
+            body = None
         try:
-            client.fetch(req, handle_response)
+            fetch_request(
+                self.request.uri, handle_response,
+                method=self.request.method, body=body,
+                headers=self.request.headers, follow_redirects=False,
+                allow_nonstandard_methods=True)
         except tornado.httpclient.HTTPError as e:
             if hasattr(e, 'response') and e.response:
                 handle_response(e.response)
