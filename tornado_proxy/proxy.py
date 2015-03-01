@@ -83,11 +83,14 @@ class ProxyHandler(tornado.web.RequestHandler):
                 self.write('Internal server error:\n' + str(response.error))
             else:
                 self.set_status(response.code)
-                for header in ('Date', 'Cache-Control', 'Server',
-                               'Content-Type', 'Location', 'Set-Cookie'):
+                for header in ('Date', 'Cache-Control', 'Server','Content-Type', 'Location'):
                     v = response.headers.get(header)
                     if v:
                         self.set_header(header, v)
+                v = response.headers.get_list('Set-Cookie')
+                if v:
+                    for i in v:
+                        self.add_header('Set-Cookie', i)
                 if response.body:
                     self.write(response.body)
             self.finish()
