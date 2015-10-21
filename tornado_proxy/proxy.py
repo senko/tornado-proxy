@@ -36,6 +36,7 @@ import tornado.ioloop
 import tornado.iostream
 import tornado.web
 import tornado.httpclient
+import tornado.httputil
 
 logger = logging.getLogger('tornado_proxy')
 
@@ -65,11 +66,14 @@ def fetch_request(url, callback, **kwargs):
 
     req = tornado.httpclient.HTTPRequest(url, **kwargs)
     client = tornado.httpclient.AsyncHTTPClient()
-    client.fetch(req, callback)
+    client.fetch(req, callback, raise_error=False)
 
 
 class ProxyHandler(tornado.web.RequestHandler):
     SUPPORTED_METHODS = ['GET', 'POST', 'CONNECT']
+    
+    def compute_etag(self):
+        return None # disable tornado Etag
 
     @tornado.web.asynchronous
     def get(self):
@@ -82,16 +86,15 @@ class ProxyHandler(tornado.web.RequestHandler):
                 self.set_status(500)
                 self.write('Internal server error:\n' + str(response.error))
             else:
-                self.set_status(response.code)
-                for header in ('Date', 'Cache-Control', 'Server','Content-Type', 'Location'):
-                    v = response.headers.get(header)
-                    if v:
-                        self.set_header(header, v)
-                v = response.headers.get_list('Set-Cookie')
-                if v:
-                    for i in v:
-                        self.add_header('Set-Cookie', i)
-                if response.body:
+                self.set_status(response.code, response.reason)
+                self._headers = tornado.httputil.HTTPHeaders() # clear tornado default header
+                
+                for header, v in response.headers.get_all():
+                    if header not in ('Content-Length', 'Transfer-Encoding', 'Content-Encoding', 'Connection'):
+                        self.add_header(header, v) # some header appear multiple times, eg 'Set-Cookie'
+                
+                if response.body:                   
+                    self.set_header('Content-Length', len(response.body))
                     self.write(response.body)
             self.finish()
 
@@ -99,6 +102,8 @@ class ProxyHandler(tornado.web.RequestHandler):
         if not body:
             body = None
         try:
+            if 'Proxy-Connection' in self.request.headers:
+                del self.request.headers['Proxy-Connection'] 
             fetch_request(
                 self.request.uri, handle_response,
                 method=self.request.method, body=body,
