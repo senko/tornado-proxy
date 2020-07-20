@@ -29,7 +29,10 @@ import logging
 import os
 import sys
 import socket
-from urlparse import urlparse
+if sys.version_info[0] == 2:
+    from urlparse import urlparse
+else:
+    from urllib.parse import urlparse
 
 import tornado.httpserver
 import tornado.ioloop
